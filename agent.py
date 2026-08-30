@@ -33,7 +33,18 @@ def call_nvidia(prompt, api_key, model):
         return None
 
 def heuristic_plan(q):
-    ql = q.lower()
+    ql = q.lower().strip()
+    greetings = ["hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening", "who are you", "help", "thanks", "thank you"]
+    if ql in greetings or any(ql.startswith(g + " ") or ql.endswith(" " + g) for g in greetings if len(g) > 2):
+        return {
+            "metric": "greeting",
+            "sector": None,
+            "start_date": None,
+            "end_date": None,
+            "needs_clarification": False,
+            "clarification": None,
+        }
+
     sector = None
     known_sectors = [
         "renewables", "mining", "railways", "powerline", "construction",
@@ -61,6 +72,10 @@ def heuristic_plan(q):
     }
 
 def plan_query(query, deals, work_orders, api_key, model):
+    hp = heuristic_plan(query)
+    if hp.get("metric") == "greeting":
+        return hp
+
     from datetime import date
     today_str = date.today().isoformat()
     prompt = f"""
@@ -77,12 +92,12 @@ Available Work Orders columns: {[c['title'] for c in work_orders['columns']]}
 """
     raw = call_nvidia(prompt, api_key, model)
     if not raw:
-        return heuristic_plan(query)
+        return hp
     try:
         raw = raw[raw.find("{"):raw.rfind("}")+1]
         return json.loads(raw)
     except Exception:
-        return heuristic_plan(query)
+        return hp
 
 def money(v):
     if v is None: return "n/a"
@@ -102,6 +117,19 @@ def clean_summary_for_llm(s):
     }
 
 def answer_query(query, plan, deals, work_orders, api_key, model):
+    # Handle greetings FIRST — before any analytics processing
+    if plan.get("metric") == "greeting":
+        return (
+            "👋 **Hello! I'm the Skylark Drones BI Agent.**\n\n"
+            "I can help you analyze your live Monday.com **Deals** and **Work Orders** data.\n\n"
+            "Here are some questions you can ask me:\n"
+            "- *What is our total pipeline value?*\n"
+            "- *How is our Mining sector performing?*\n"
+            "- *How many work orders are currently active?*\n"
+            "- *Give me a full dashboard summary.*\n"
+            "- *Which sector has the most deals?*"
+        )
+
     s = summarize(deals, work_orders, plan)
     if s["deals_count"] == 0 and s["work_orders_count"] == 0:
         return f"I couldn't find matching records for **'{query}'**. The requested sector or date filters may have no recorded items."
@@ -112,11 +140,12 @@ Question: {query}
 Plan: {json.dumps(plan)}
 Computed results from live Monday.com data:
 {json.dumps(llm_payload, default=str, indent=2)}
-Write a founder-level answer in simple language. Include:
-1) direct answer,
-2) 2-4 useful insights,
-3) data-quality caveats if present.
-Never invent values not present in the computed results.
+Write a concise, founder-level answer in simple language. Include:
+1) direct answer to the question,
+2) 2-4 relevant insights based on the data,
+3) brief data-quality caveats only if there are significant missing values.
+Stay strictly focused on what the user asked. Do not repeat all metrics if the question is about one specific thing.
+Never invent values not in the computed results.
 """
     raw = call_nvidia(base, api_key, model)
     if raw:
@@ -125,6 +154,7 @@ Never invent values not present in the computed results.
     # Dynamic query-aware fallback formatting
     sector_str = f" in **{plan.get('sector').capitalize()}**" if plan.get('sector') else ""
     metric_type = plan.get('metric', 'mixed')
+
 
     if metric_type == 'operations':
         return (
