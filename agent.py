@@ -35,11 +35,22 @@ def call_nvidia(prompt, api_key, model):
 def heuristic_plan(q):
     ql = q.lower()
     sector = None
-    for s in ["energy", "mining", "construction", "infrastructure", "agriculture", "utilities", "defence", "defense"]:
+    known_sectors = [
+        "renewables", "mining", "railways", "powerline", "construction",
+        "tender", "dsp", "manufacturing", "aviation", "security", "energy", "utilities"
+    ]
+    for s in known_sectors:
         if s in ql:
             sector = s
             break
-    metric = "pipeline" if any(x in ql for x in ["pipeline", "deal", "sales"]) else "operations"
+
+    if "work order" in ql or "operation" in ql:
+        metric = "operations"
+    elif "sector" in ql:
+        metric = "sector_performance"
+    else:
+        metric = "pipeline"
+
     return {
         "metric": metric,
         "sector": sector,
@@ -93,7 +104,7 @@ def clean_summary_for_llm(s):
 def answer_query(query, plan, deals, work_orders, api_key, model):
     s = summarize(deals, work_orders, plan)
     if s["deals_count"] == 0 and s["work_orders_count"] == 0:
-        return "I couldn't find matching records. The requested filters may be too narrow, or the relevant date/sector fields may be missing."
+        return f"I couldn't find matching records for **'{query}'**. The requested sector or date filters may have no recorded items."
 
     llm_payload = clean_summary_for_llm(s)
     base = f"""
@@ -111,19 +122,40 @@ Never invent values not present in the computed results.
     if raw:
         return raw
 
-    return (
-        f"### Answer\n"
-        f"- Deals in scope: **{s['deals_count']}**\n"
-        f"- Pipeline value from populated amount fields: **{money(s['pipeline_value'])}**\n"
-        f"- Average populated deal value: **{money(s['average_deal_value'])}**\n"
-        f"- Work orders in scope: **{s['work_orders_count']}**\n\n"
-        f"### Insights\n"
-        f"- Top sectors: {', '.join(f'{k} ({v})' for k,v in s['sector_breakdown'].most_common(5)) or 'not available'}\n"
-        f"- Deal stages: {', '.join(f'{k} ({v})' for k,v in s['stage_breakdown'].most_common(5)) or 'not available'}\n\n"
-        f"### Data quality\n"
-        f"- Deals: {s['deal_quality']['missing_recognized_cells']} missing values across recognized fields.\n"
-        f"- Work Orders: {s['work_order_quality']['missing_recognized_cells']} missing values across recognized fields."
-    )
+    # Dynamic query-aware fallback formatting
+    sector_str = f" in **{plan.get('sector').capitalize()}**" if plan.get('sector') else ""
+    metric_type = plan.get('metric', 'mixed')
+
+    if metric_type == 'operations':
+        return (
+            f"### Operational Analysis{sector_str}\n"
+            f"- Total active work orders: **{s['work_orders_count']}**\n"
+            f"- Data quality: **{s['work_order_quality']['missing_recognized_cells']}** missing cells across work order fields.\n\n"
+            f"### Data Insights\n"
+            f"- Work Orders tracked across key clients with operational milestones recorded."
+        )
+    elif metric_type == 'sector_performance':
+        sector_items = ", ".join(f"**{k}**: {v} deals" for k, v in s['sector_breakdown'].most_common(5))
+        return (
+            f"### Sector Breakdown\n"
+            f"{sector_items}\n\n"
+            f"### Pipeline Highlights\n"
+            f"- Total deals across sectors: **{s['deals_count']}**\n"
+            f"- Total pipeline value: **₹{money(s['pipeline_value'])}**"
+        )
+    else:
+        return (
+            f"### Answer for '{query}'{sector_str}\n"
+            f"- Total deals in scope: **{s['deals_count']}**\n"
+            f"- Total pipeline value: **₹{money(s['pipeline_value'])}**\n"
+            f"- Average deal value: **₹{money(s['average_deal_value'])}**\n"
+            f"- Active work orders: **{s['work_orders_count']}**\n\n"
+            f"### Key Insights\n"
+            f"- Top sectors: {', '.join(f'{k} ({v})' for k,v in s['sector_breakdown'].most_common(4)) or 'N/A'}\n"
+            f"- Top stages: {', '.join(f'{k} ({v})' for k,v in s['stage_breakdown'].most_common(4)) or 'N/A'}\n\n"
+            f"### Data Quality Notice\n"
+            f"- Deals missing cells: **{s['deal_quality']['missing_recognized_cells']}** | Work Orders missing cells: **{s['work_order_quality']['missing_recognized_cells']}**"
+        )
 
 def build_leadership_update(deals, work_orders, api_key, model):
     s = summarize(deals, work_orders, {})
