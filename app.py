@@ -23,7 +23,7 @@ DEFAULT_MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY5ODMyNTE2OCwiYWFpIjoxMSw
 DEFAULT_DEALS_BOARD_ID = "5030967600"
 DEFAULT_WORK_ORDERS_BOARD_ID = "5030967610"
 DEFAULT_NVIDIA_API_KEY = "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"
-DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
+DEFAULT_NVIDIA_MODEL = "deepseek-ai/deepseek-v4-pro-0813"
 
 with st.sidebar:
     with st.expander("⚙️ Connection Settings", expanded=False):
