@@ -1,5 +1,17 @@
 import os, json
+from pathlib import Path
 import streamlit as st
+
+# Automatically load .env file if present so credentials default in sidebar
+env_path = Path(__file__).parent / ".env"
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ[k.strip()] = v.strip()
+
 from monday_client import MondayClient, MondayAPIError
 from agent import plan_query, answer_query, build_leadership_update
 
