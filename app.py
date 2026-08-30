@@ -19,23 +19,29 @@ st.set_page_config(page_title="Skylark BI Agent", page_icon="📊", layout="wide
 st.title("📊 Skylark Drones — Monday.com BI Agent")
 st.caption("Read-only business intelligence agent for Work Orders and Deals")
 
+DEFAULT_MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY5ODMyNTE2OCwiYWFpIjoxMSwidWlkIjoxMTQ3OTE4MjEsImlhZCI6IjIwMjYtMDgtMzBUMDc6NDQ6MTEuMzAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjM2NjcyMzI4LCJyZ24iOiJhcHNlMiJ9.k_nGTA6U3ORViqWgh_QW85S1_yj_sSAeqO_kIG1gr_Q"
+DEFAULT_DEALS_BOARD_ID = "5030967600"
+DEFAULT_WORK_ORDERS_BOARD_ID = "5030967610"
+DEFAULT_NVIDIA_API_KEY = "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"
+DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
+
 with st.sidebar:
     st.header("Connection")
     monday_token = st.text_input(
         "Monday API token",
-        value=os.getenv("MONDAY_API_TOKEN", ""),
+        value=os.getenv("MONDAY_API_TOKEN", DEFAULT_MONDAY_TOKEN),
         type="password",
         help="Use a Monday.com token with boards:read permission."
     )
-    deals_board = st.text_input("Deals board ID", value=os.getenv("DEALS_BOARD_ID", ""))
-    work_orders_board = st.text_input("Work Orders board ID", value=os.getenv("WORK_ORDERS_BOARD_ID", ""))
+    deals_board = st.text_input("Deals board ID", value=os.getenv("DEALS_BOARD_ID", DEFAULT_DEALS_BOARD_ID))
+    work_orders_board = st.text_input("Work Orders board ID", value=os.getenv("WORK_ORDERS_BOARD_ID", DEFAULT_WORK_ORDERS_BOARD_ID))
     nvidia_key = st.text_input(
         "NVIDIA API key",
-        value=os.getenv("NVIDIA_API_KEY", ""),
+        value=os.getenv("NVIDIA_API_KEY", DEFAULT_NVIDIA_API_KEY),
         type="password",
         help="NVIDIA NIM API key from integrate.api.nvidia.com. Required for AI-powered answers."
     )
-    model = st.text_input("NVIDIA model", value=os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"))
+    model = st.text_input("NVIDIA model", value=os.getenv("NVIDIA_MODEL", DEFAULT_NVIDIA_MODEL))
 
     st.divider()
     st.markdown("**Read-only by design:** this prototype only calls Monday GraphQL queries.")
